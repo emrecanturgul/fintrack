@@ -59,8 +59,8 @@ her kayıt bir kullanıcıya aittir; bir kullanıcı başkasının verisini hiç
 | RefreshToken | id, userId, tokenHash, expiresAt, revokedAt, replacedById | rotation zinciri |
 | ApiKey | id, userId, name, prefix, keyHash, scopes, lastUsedAt, revokedAt | anahtarın kendisi saklanmaz |
 | Account | id, userId, name, bankName, type (bank/card/cash), currency |  |
-| ImportJob | id, userId, accountId, fileName, fileHash, format, status, totalRows, importedRows, skippedRows, error, createdAt | aynı fileHash ikinci kez işlenmez |
-| Transaction | id, userId, accountId, date, description, amount, currency, amountInBase, fxRate, categoryId, categorySource (ai/rule/user), merchant, note, dedupHash, importJobId | dedupHash tekil: aynı işlem iki kez yazılmaz |
+| ImportJob | id, userId, accountId, fileName, fileHash, format, status, totalRows, importedRows, skippedRows, error, createdAt | (userId, fileHash) tekil: aynı kullanıcı aynı dosyayı iki kez işleyemez |
+| Transaction | id, userId, accountId, date, description, amount, currency, amountInBase, fxRate, categoryId, categorySource (ai/rule/user), merchant, note, dedupHash, importJobId | (accountId, dedupHash) tekil: aynı işlem iki kez yazılmaz |
 | Category | id, userId (null = sistem), name, parentId, icon | sistem + kullanıcı kategorileri |
 | CategoryRule | id, userId, pattern, categoryId, priority, createdFrom (user/ai) | "migros → market" |
 | Budget | id, userId, categoryId, monthlyLimit, currency, alertAt (ör. %80) |  |
@@ -109,7 +109,7 @@ tümü `/api/v1` altında. auth dışındaki her şey giriş ister; `/external` 
 
 ## zor kısımlar ve mimari kararlar
 
-1. **import ve idempotency:** dosyanın hash'i (`fileHash`) aynı dosyanın ikinci kez işlenmesini engeller. her işlemin `dedupHash`'i (hesap + tarih + tutar + açıklama) çakışan dökümlerde aynı işlemin iki kez yazılmasını engeller; veritabanında unique index ile garanti altına alınır.
+1. **import ve idempotency:** dosyanın hash'i (`fileHash`) aynı kullanıcının aynı dosyayı ikinci kez işlemesini engeller; farklı kullanıcılar aynı dosyayı yükleyebilir. her işlemin `dedupHash`'i (hesap + tarih + tutar + açıklama) çakışan dökümlerde aynı işlemin iki kez yazılmasını engeller. ikisi de veritabanında unique index ile garanti altına alınır: `(userId, fileHash)` ve `(accountId, dedupHash)`.
 2. **banka formatları:** her banka için bir `IStatementParser`. yeni banka = yeni sınıf, mevcut kod değişmez. tanınmayan format açık bir hata ile reddedilir.
 3. **arka plan işleme:** `POST /imports` dosyayı kaydedip job'u kuyruğa (channel) atar ve hemen `202` döner. `BackgroundService` kuyruktan okur, satırları batch halinde yazar, job durumunu günceller. uygulama yeniden başlarsa yarım kalan job'lar `queued` durumuna döner.
 4. **kategorizasyon sırası:** önce kullanıcı kuralları, sonra sistem kuralları, en son ai. ai sadece kuralların yakalamadığı işlemlere, batch halinde gider (maliyet ve hız). ai yanıtı yapılandırılmış json olarak alınır; geçersiz yanıt ya da hata durumunda işlem "kategorisiz" kalır, import asla ai yüzünden başarısız olmaz.
