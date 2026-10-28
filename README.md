@@ -27,9 +27,14 @@ referans yönü: domain ← application ← infrastructure ← api.
 
 ## nasıl çalıştırılır
 
-gereksinimler: .net sdk 10.0.4xx, node 22, npm 11.
+gereksinimler: .net sdk 10.0.4xx, node 22, npm 11, docker.
 
 ```bash
+# veritabanı (postgres 18, localhost:5433)
+docker compose up -d
+dotnet tool restore
+dotnet ef database update --project src/FinTrack.Infrastructure --startup-project src/FinTrack.Api
+
 # backend
 dotnet build
 dotnet test
